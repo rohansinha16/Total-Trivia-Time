@@ -354,7 +354,7 @@ function handleRequest(intent, session, callback){
 			sessions[id].category = categoryDict["Art"];
 			speechOutput += "Art ";
 		}
-		else if(cmd.indexOf("category") >= 0){
+		else if(cmd.indexOf("categor") >= 0){
 			valid = false;
 			speechOutput += "I'm sorry, that is not an available category. Choose between the following choices: everything, general knowledge, entertainment, science, geography, history and mythology, sports, and art.";
 			callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
@@ -457,7 +457,7 @@ function handleRequest(intent, session, callback){
 			sessions[id].category = categoryDict["Art"];
 			speechOutput += "Art ";
 		}
-		else if(cmd.indexOf("category") >= 0){
+		else if(cmd.indexOf("categor") >= 0){
 			validCat = false;
 			speechOutput += "I'm sorry, that is not an available category. You can choose between the following choices: everything, general knowledge, entertainment, science, geography, history and mythology, sports, and art.";
 		}
@@ -497,7 +497,7 @@ function handleRequest(intent, session, callback){
 			cmd.indexOf("history") >= 0 || cmd.indexOf("mythology") >= 0 ||
 			cmd.indexOf("sports") >= 0 ||
 			cmd.indexOf("art") >= 0||
-			cmd.indexOf("category") >= 0){
+			cmd.indexOf("categor") >= 0){
 			speechOutput = "Sorry, you can't change the category now. You can change game settings after a question has been answered.";
 		}
 		else{
