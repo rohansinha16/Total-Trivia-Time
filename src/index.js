@@ -166,8 +166,29 @@ function handleRequest(intent, session, callback){
 	var reprompt = "";
 	// user input
 	var cmd = intent.slots.command.value.toLowerCase();
+	if(cmd.indexOf("repeat") >= 0){
+		speechOutput = "Sure. " + sessions[id].prev;
+		reprompt = sessions[id].prev;
+		callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
+	}
+	else if(cmd.indexOf("help") >= 0){
+		speechOutput = "You can ask to stop at any time to quit the game. "
+			+ "If you would like to repeat the previous prompt, just ask Alexa to repeat the question. " 
+			+ "If you are trying to change a setting, keep in mind you can only change settings after a question has been answered. "
+			+ "The difficulty options are all, low, medium, hard, very hard, and extreme. "
+			+ "The categories you can select from are everything, general knowledge, entertainment, science, geography, history and mythology, sports, and art.";
+		reprompt = sessions[id].prev;
+		callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
+	}
+	else if(cmd.indexOf("stop") >= 0){
+		endSession = true;
+		speechOutput = "Thank you for playing!";
+		reprompt = "";
+		delete(sessions[id]);
+		callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
+	}
 	// question answer
-	if(sessions[id].gameState == 5){
+	else if(sessions[id].gameState == 5){
 		sessions[id].gameState = 6;
 		// multiple choice question
 		if(sessions[id].multiple){
@@ -205,7 +226,7 @@ function handleRequest(intent, session, callback){
 			}
 			else{
 				sessions[id].gameState = 5;
-				speechOutput += "You did not indicate your answer using a, b, c, or d. "
+				speechOutput += "You did not indicate your answer using a, b, c, or d. ";
 				speechOutput += sessions[id].prev;
 			}
 		}
@@ -230,10 +251,10 @@ function handleRequest(intent, session, callback){
 		if(sessions[id].gameState != 5){
 			speechOutput += "The answer was \"";
 			if(sessions[id].multiple){
-				speechOutput += String.fromCharCode(97 + sessions[id].multAns) + ") "
+				speechOutput += String.fromCharCode(97 + sessions[id].multAns) + ") ";
 			}
-			speechOutput += sessions[id].answer + "\". Are you ready for the next question?"
-			reprompt = "Are you ready for the next question?"
+			speechOutput += sessions[id].answer + "\". Are you ready for the next question?";
+			reprompt = "Are you ready for the next question?";
 			sessions[id].prev = speechOutput;
 		}
 		callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
@@ -284,24 +305,6 @@ function handleRequest(intent, session, callback){
 				speechOutput = "Sorry, you can't change the category now. You can change game settings after a question has been answered.";
 				reprompt = sessions[id].prev;
 			}
-			else if(cmd.indexOf("repeat") >= 0){
-				speechOutput = "Sure. " + sessions[id].prev;
-				reprompt = sessions[id].prev;
-			}
-			else if(cmd.indexOf("help") >= 0){
-				speechOutput = "You can ask to stop at any time to quit the game. "
-					+ "If you would like to repeat the previous prompt, just ask Alexa to repeat the question. " 
-					+ "If you are trying to change a setting, keep in mind you can only change settings after a question has been answered. "
-					+ "The difficulty options are all, low, medium, hard, very hard, and extreme. "
-					+ "The categories you can select from are everything, general knowledge, entertainment, science, geography, history and mythology, sports, and art.";
-				reprompt = sessions[id].prev;
-			}
-			else if(cmd.indexOf("stop") >= 0){
-				endSession = true;
-				speechOutput = "Thank you for playing!";
-				reprompt = "";
-				delete(sessions[id]);
-			}
 			else{
 				speechOutput = "I'm sorry, I couldn't understand what you said.";
 				reprompt = sessions[id].prev;
@@ -321,7 +324,7 @@ function handleRequest(intent, session, callback){
 		valid = true;
 		if(cmd.indexOf("everything") >= 0){
 			sessions[id].category = [];
-			speechOutput += "All categories "
+			speechOutput += "All categories ";
 		}
 		else if(cmd.indexOf("general knowledge") >= 0){
 			sessions[id].category = categoryDict["General Knowledge"];
@@ -348,7 +351,7 @@ function handleRequest(intent, session, callback){
 			speechOutput += "Sports ";
 		}
 		else if(cmd.indexOf("art") >= 0){
-			sessions[id].category = categoryDict["Art"];a
+			sessions[id].category = categoryDict["Art"];
 			speechOutput += "Art ";
 		}
 		else if(cmd.indexOf("category") >= 0){
@@ -366,26 +369,7 @@ function handleRequest(intent, session, callback){
 				cmd.indexOf("extreme") >= 0 ||
 				cmd.indexOf("difficult") >= 0 || cmd.indexOf("mode") >= 0){
 				speechOutput = "Sorry, you can't change the difficulty now. You can change game settings after a question has been answered.";
-			}
-			else if(cmd.indexOf("repeat") >= 0){
-				speechOutput = "Sure. " + sessions[id].prev;
-				reprompt = sessions[id].prev;
-			}
-			else if(cmd.indexOf("help") >= 0){
-				speechOutput = "You can ask to stop at any time to quit the game. "
-					+ "If you would like to repeat the previous prompt, just ask Alexa to repeat the question. " 
-					+ "If you are trying to change a setting, keep in mind you can only change settings after a question has been answered. "
-					+ "The difficulty options are all, low, medium, hard, very hard, and extreme. "
-					+ "The categories you can select from are everything, general knowledge, entertainment, science, geography, history and mythology, sports, and art.";
-				reprompt = sessions[id].prev;
-			}
-			else if(cmd.indexOf("stop") >= 0){
-				endSession = true;
-				speechOutput = "Thank you for playing!";
-				reprompt = "";
-				delete(sessions[id]);
-			}
-			else{
+			}else{
 				speechOutput = "I'm sorry, I couldn't understand what you said.";
 				reprompt = sessions[id].prev;
 			}
@@ -443,7 +427,7 @@ function handleRequest(intent, session, callback){
 		// category check
 		if(cmd.indexOf("everything") >= 0){
 			sessions[id].category = [];
-			speechOutput += "All categories "
+			speechOutput += "All categories ";
 		}
 		else if(cmd.indexOf("general knowledge") >= 0){
 			sessions[id].category = categoryDict["General Knowledge"];
@@ -470,7 +454,7 @@ function handleRequest(intent, session, callback){
 			speechOutput += "Sports ";
 		}
 		else if(cmd.indexOf("art") >= 0){
-			sessions[id].category = categoryDict["Art"];a
+			sessions[id].category = categoryDict["Art"];
 			speechOutput += "Art ";
 		}
 		else if(cmd.indexOf("category") >= 0){
@@ -484,28 +468,8 @@ function handleRequest(intent, session, callback){
 			speechOutput += "selected. ";
 		}
 		if(speechOutput == ""){
-			if(cmd.indexOf("repeat") >= 0){
-				speechOutput = "Sure. " + sessions[id].prev;
-				reprompt = sessions[id].prev;
-			}
-			else if(cmd.indexOf("help") >= 0){
-				speechOutput = "You can ask to stop at any time to quit the game. "
-					+ "If you would like to repeat the previous prompt, just ask Alexa to repeat the question. " 
-					+ "If you are trying to change a setting, keep in mind you can only change settings after a question has been answered. "
-					+ "The difficulty options are all, low, medium, hard, very hard, and extreme. "
-					+ "The categories you can select from are everything, general knowledge, entertainment, science, geography, history and mythology, sports, and art.";
-				reprompt = sessions[id].prev;
-			}
-			else if(cmd.indexOf("stop") >= 0){
-				endSession = true;
-				speechOutput = "Thank you for playing!";
-				reprompt = "";
-				delete(sessions[id]);
-			}
-			else{
-				speechOutput = "I'm sorry, I couldn't understand what you said.";
-				reprompt = sessions[id].prev;
-			}
+			speechOutput = "I'm sorry, I couldn't understand what you said.";
+			reprompt = sessions[id].prev;
 			callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
 		}
 		else{
@@ -535,24 +499,6 @@ function handleRequest(intent, session, callback){
 			cmd.indexOf("art") >= 0||
 			cmd.indexOf("category") >= 0){
 			speechOutput = "Sorry, you can't change the category now. You can change game settings after a question has been answered.";
-		}
-		else if(cmd.indexOf("repeat") >= 0){
-			speechOutput = "Sure. " + sessions[id].prev;
-			reprompt = sessions[id].prev;
-		}
-		else if(cmd.indexOf("help") >= 0){
-			speechOutput = "You can ask to stop at any time to quit the game. "
-				+ "If you would like to repeat the previous prompt, just ask Alexa to repeat the question. " 
-				+ "If you are trying to change a setting, keep in mind you can only change settings after a question has been answered. "
-				+ "The difficulty options are all, low, medium, hard, very hard, and extreme. "
-				+ "The categories you can select from are everything, general knowledge, entertainment, science, geography, history and mythology, sports, and art.";
-			reprompt = sessions[id].prev;
-		}
-		else if(cmd.indexOf("stop") >= 0){
-			endSession = true;
-			speechOutput = "Thank you for playing!";
-			reprompt = "";
-			delete(sessions[id]);
 		}
 		else{
 			speechOutput = "I'm sorry, I couldn't understand what you said.";
@@ -606,7 +552,7 @@ function handleYes(intent, session, callback){
 				// save correct answer
 				speechOutput += " True or false?";
 				sessions[id].answer = decode(result.correct_answer).toLowerCase();
-				sessions[id].choices = []
+				sessions[id].choices = [];
 			}
 			else{
 				var answers = [];
@@ -650,7 +596,7 @@ function handleYes(intent, session, callback){
 				sessions[id].multiple = sessions[id].multiple || isSplice;
 				if(sessions[id].multiple){
 					sessions[id].multAns = loc;
-					speechOutput += "Please indicate your answer using a, b, c, or d. "
+					speechOutput += "Please indicate your answer using a, b, c, or d. ";
 				}
 				// add answer choices to speech output
 				for(var i = 0; i < answers.length - 1; i++){
