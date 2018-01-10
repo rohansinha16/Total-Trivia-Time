@@ -1,0 +1,23 @@
+{
+  "intents": [
+    {
+      "intent": "AMAZON.YesIntent"
+    }, {
+      "intent": "AMAZON.NoIntent"
+    }, {
+      "intent": "AMAZON.RepeatIntent"
+    }, {
+      "intent": "AMAZON.StopIntent"
+    }, {
+      "intent": "AMAZON.HelpIntent"
+    }, {
+      "intent": "sendRequest",
+      "slots": [
+          {
+            "name": "command",
+            "type": "AMAZON.LITERAL"
+          }
+      ]
+    }
+  ]
+}
