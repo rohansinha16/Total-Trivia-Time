@@ -1,8 +1,8 @@
 const request = require("request");
-
-
 const sessions = {};
+
 const categoryDict = {
+	"all": [],
 	"General Knowledge": [9],
 	"Entertainment": [10, 11, 12, 13, 14, 15, 16, 26, 29, 31, 32], 
 	"Science": [17, 18, 19, 27, 30], 
@@ -12,6 +12,14 @@ const categoryDict = {
 	"Art": [25],
 };
 
+const difficultyDict ={
+	"all": ["easy", "medium", "hard"],
+	"low": ["easy"],
+	"medium": ["easy", "medium"],
+	"very hard": ["medium", "hard"],
+	"hard": ["medium"],
+	"extreme": ["hard"]
+}
 
 const getSession = (alexaid) => {
 	if(!(alexaid in sessions)){
@@ -43,20 +51,13 @@ exports.handler = function (event, context) {
 	console.log("recieved event");
 	try {
 		console.log("event.session.application.applicationId=" + event.session.application.applicationId);
-
 		/**
 		 * Uncomment this if statement and populate with your skill's application ID to
 		 * prevent someone else from configuring a skill that sends requests to this function.
 		 */
-
-	// if (event.session.application.applicationId !== "") {
-	//     context.fail("Invalid Application ID");
-	//  }
-
-		if (event.session.new) {
-			onSessionStarted({requestId: event.request.requestId}, event.session);
-		}
-
+		// if (event.session.application.applicationId !== "") {
+		//     context.fail("Invalid Application ID");
+		// }
 		if (event.request.type === "LaunchRequest") {
 			onLaunch(event.request,
 				event.session,
@@ -77,13 +78,6 @@ exports.handler = function (event, context) {
 		context.fail("Exception: " + e);
 	}
 };
-
-/**
- * Called when the session starts.
- */
-function onSessionStarted(sessionStartedRequest, session) {
-	// add any session init logic here
-}
 
 /**
  * Called when the user invokes the skill without specifying what they want.
@@ -113,7 +107,7 @@ function onIntent(intentRequest, session, callback) {
 	else if(intentName == "AMAZON.RepeatIntent"){
 		handleRepeat(intent, session, callback);
 	}
-	else if(intentName == "AMAZON.StopIntent"){
+	else if(intentName == "AMAZON.StopIntent" || intentName == "AMAZON.CancelIntent"){
 		handleStop(intent, session, callback);
 	}
 	else if(intentName == "sendRequest"){
@@ -164,28 +158,18 @@ function handleRequest(intent, session, callback){
 	var endSession = false;
 	var speechOutput = "";
 	var reprompt = "";
-	// user input
 	var cmd = intent.slots.command.value.toLowerCase();
+	cmd = " " + cmd.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, " ") + " ";
+	console.log(cmd);
+	console.log(cmd.indexOf("repeat"));
 	if(cmd.indexOf("repeat") >= 0){
-		speechOutput = "Sure. " + sessions[id].prev;
-		reprompt = sessions[id].prev;
-		callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
+		handleRepeat(intent, session, callback);
 	}
 	else if(cmd.indexOf("help") >= 0){
-		speechOutput = "You can ask to stop at any time to quit the game. "
-			+ "If you would like to repeat the previous prompt, just ask Alexa to repeat the question. " 
-			+ "If you are trying to change a setting, keep in mind you can only change settings after a question has been answered. "
-			+ "The difficulty options are all, low, medium, hard, very hard, and extreme. "
-			+ "The categories you can select from are everything, general knowledge, entertainment, science, geography, history and mythology, sports, and art.";
-		reprompt = sessions[id].prev;
-		callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
+		handleHelp(intent, session, callback);
 	}
-	else if(cmd.indexOf("stop") >= 0){
-		endSession = true;
-		speechOutput = "Thank you for playing!";
-		reprompt = "";
-		delete(sessions[id]);
-		callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
+	else if(cmd.indexOf("stop") >= 0 || cmd.indexOf("cancel") >= 0){
+		handleStop(intent, session, callback);
 	}
 	// question answer
 	else if(sessions[id].gameState == 5){
@@ -261,47 +245,12 @@ function handleRequest(intent, session, callback){
 	}
 	// select difficulty
 	else if(sessions[id].gameState == 0){
-		var valid = true;
-		if(cmd.indexOf("all") >= 0){
-			sessions[id].diff = ["easy", "medium", "hard"];
-			speechOutput += "All difficulties ";
-		}
-		else if(cmd.indexOf("low") >= 0 || cmd.indexOf("easy") >= 0){
-			sessions[id].diff = ["easy"];
-			speechOutput += "Low difficulty ";
-		}
-		else if(cmd.indexOf("medium") >= 0 || cmd.indexOf("average") >= 0){
-			sessions[id].diff = ["easy", "medium"];
-			speechOutput += "Medium difficulty ";
-		}
-		else if(cmd.indexOf("very hard") >= 0){
-			sessions[id].diff = ["medium", "hard"];
-			speechOutput += "Very hard difficulty ";
-		}
-		else if(cmd.indexOf("hard") >= 0 || cmd.indexOf("high") >= 0){
-			sessions[id].diff = ["medium"];
-			speechOutput += "Hard difficulty ";
-		}
-		else if(cmd.indexOf("extreme") >= 0){
-			sessions[id].diff = ["hard"];
-			speechOutput += "Extreme difficulty ";
-		}
-		else if(cmd.indexOf("difficult") >= 0 || cmd.indexOf("mode") >= 0){
-			valid = false;
-			speechOutput = "Sorry, that difficulty is not available. The difficulty options are all, low, medium, hard, very hard, and extreme.";
-			callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
-		}
-		else{
-			valid = false;
-			if(cmd.indexOf("everything") >= 0 ||
-				cmd.indexOf("general knowledge") >= 0 ||
-				cmd.indexOf("entertainment") >= 0 ||
-				cmd.indexOf("science") >= 0 ||
-				cmd.indexOf("geography") >= 0 ||
-				cmd.indexOf("history") >= 0 || cmd.indexOf("mythology") >= 0 ||
-				cmd.indexOf("sports") >= 0 ||
-				cmd.indexOf("art") >= 0||
-				cmd.indexOf("category") >= 0){
+		// nlp
+		var diff = checkDiff(cmd);
+		// no difficulty found
+		if(diff == ""){
+			// check if they tried to change category
+			if(checkCat(cmd) != "") {
 				speechOutput = "Sorry, you can't change the category now. You can change game settings after a question has been answered.";
 				reprompt = sessions[id].prev;
 			}
@@ -309,200 +258,93 @@ function handleRequest(intent, session, callback){
 				speechOutput = "I'm sorry, I couldn't understand what you said.";
 				reprompt = sessions[id].prev;
 			}
-			callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
 		}
-		if(valid){
+		// no difficulty found but diff intent
+		else if(diff == "diff"){
+			speechOutput = "Sorry, that difficulty is not available. The difficulty options are all, low, medium, hard, very hard, and extreme.";
+			reprompt = "What difficulty would you like to play at?";
+		}
+		// difficulty found
+		else{
 			sessions[id].gameState = 1;
-			speechOutput += "selected. Would you like to play a specific category? Answer no to play questions from all categories.";
+			sessions[id].diff = difficultyDict[diff];
+			speechOutput = diff.substring(0,1).toUpperCase() + diff.substring(1, diff.length) + " difficulty selected. Would you like to play a specific category? Answer no to play questions from all categories.";
 			reprompt = "You can also answer yes to only get Trivia questions from one of the following categories: everything, general knowledge, entertainment, science, geography, history and mythology, sports, and art.";
 			sessions[id].prev = "Would you like to play a specific category? Answer no to play questions from all categories.";
-			callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
 		}
+		callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
 	}
 	// select category
 	else if(sessions[id].gameState == 2){
-		valid = true;
-		if(cmd.indexOf("everything") >= 0){
-			sessions[id].category = [];
-			speechOutput += "All categories ";
-		}
-		else if(cmd.indexOf("general knowledge") >= 0){
-			sessions[id].category = categoryDict["General Knowledge"];
-			speechOutput += "General knowledge ";
-		}
-		else if(cmd.indexOf("entertainment") >= 0){
-			sessions[id].category = categoryDict["Entertainment"];
-			speechOutput += "Entertainment ";
-		}
-		else if(cmd.indexOf("science") >= 0){
-			sessions[id].category = categoryDict["Science"];
-			speechOutput += "Science ";
-		}
-		else if(cmd.indexOf("geography") >= 0){
-			sessions[id].category = categoryDict["Geography"];
-			speechOutput += "Geography ";
-		}
-		else if(cmd.indexOf("history") >= 0 || cmd.indexOf("mythology") >= 0){
-			sessions[id].category = categoryDict["History and Mythology"];
-			speechOutput += "History and Mythology ";
-		}
-		else if(cmd.indexOf("sports") >= 0){
-			sessions[id].category = categoryDict["Sports"];
-			speechOutput += "Sports ";
-		}
-		else if(cmd.indexOf("art") >= 0){
-			sessions[id].category = categoryDict["Art"];
-			speechOutput += "Art ";
-		}
-		else if(cmd.indexOf("categor") >= 0){
-			valid = false;
-			speechOutput += "I'm sorry, that is not an available category. Choose between the following choices: everything, general knowledge, entertainment, science, geography, history and mythology, sports, and art.";
-			callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
-		}
-		else{
-			valid = false;
-			if(cmd.indexOf("all") >= 0 || 
-				cmd.indexOf("low") >= 0 || cmd.indexOf("easy") >= 0 ||
-				cmd.indexOf("medium") >= 0 || cmd.indexOf("average") >= 0 ||
-				cmd.indexOf("very hard") >= 0 ||
-				cmd.indexOf("hard") >= 0 || cmd.indexOf("high") >= 0 ||
-				cmd.indexOf("extreme") >= 0 ||
-				cmd.indexOf("difficult") >= 0 || cmd.indexOf("mode") >= 0){
+		var cat = checkCat(cmd);
+		// no category found
+		if(cat == ""){
+			// check for difficulty intent
+			if(checkDiff(cmd) != ""){
 				speechOutput = "Sorry, you can't change the difficulty now. You can change game settings after a question has been answered.";
-			}else{
+				reprompt = sessions[id].prev;
+			}
+			else{
 				speechOutput = "I'm sorry, I couldn't understand what you said.";
 				reprompt = sessions[id].prev;
 			}
-			callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
 		}
-		if(valid){
+		// no category but category intent
+		else if(cat == "category"){
+			speechOutput = "I'm sorry, that is not an available category. Choose between the following choices: everything, general knowledge, entertainment, science, geography, history and mythology, sports, and art.";
+			reprompt = "What category would you like to play? The default is everything.";
+		}
+		// category found
+		else{
 			sessions[id].gameState = 3;
-			speechOutput += "selected. You can change the settings at any time after a question has been answered. Are you ready to play?";
+			sessions[id].category = categoryDict[cat];
+			if(cat == "all"){
+				speechOutput = "All categories"
+			}
+			else{
+				speechOutput = cat;
+			}
+			speechOutput += " selected. You can change the settings at any time after a question has been answered. Are you ready to play?";
 			reprompt = "Are you ready to play?";
 			sessions[id].prev = speechOutput;
-			callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
 		}
+		callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
 	}
 	// change settings
 	else if(sessions[id].gameState == 6 || sessions[id].gameState == 7){
-		// difficulty change
-		var validDiff = true;
-		// category change
-		var validCat = true;
-		// difficulty check
-		if(cmd.indexOf("all") >= 0){
-			sessions[id].diff = ["easy", "medium", "hard"];
-			speechOutput += "All difficulties ";
+		var diff = checkDiff(cmd);
+		var cat = checkCat(cmd);
+		reprompt = "Are you ready to play?";
+		// diff found wtih no diff intent
+		if(diff == "diff"){
+			speechOutput += "Sorry, that difficulty is not available. The difficulty options are all, low, medium, hard, very hard, and extreme. ";	
 		}
-		else if(cmd.indexOf("low") >= 0 || cmd.indexOf("easy") >= 0){
-			sessions[id].diff = ["easy"];
-			speechOutput += "Low difficulty ";
+		// difficulty found
+		else if(diff != ""){
+			sessions[id].diff = difficultyDict[diff];
+			speechOutput += diff.substring(0,1).toUpperCase() + diff.substring(1, diff.length) + " difficulty selected. ";
 		}
-		else if(cmd.indexOf("medium") >= 0 || cmd.indexOf("average") >= 0){
-			sessions[id].diff = ["easy", "medium"];
-			speechOutput += "Medium difficulty ";
-		}
-		else if(cmd.indexOf("very hard") >= 0){
-			sessions[id].diff = ["medium", "hard"];
-			speechOutput += "Very hard difficulty ";
-		}
-		else if(cmd.indexOf("hard") >= 0 || cmd.indexOf("high") >= 0){
-			sessions[id].diff = ["medium"];
-			speechOutput += "Hard difficulty ";
-		}
-		else if(cmd.indexOf("extreme") >= 0){
-			sessions[id].diff = ["hard"];
-			speechOutput += "Extreme difficulty ";
-		}
-		else if(cmd.indexOf("difficult") >= 0 || cmd.indexOf("mode") >= 0){
-			validDiff = false;
-			speechOutput = "Sorry, that difficulty is not available. The difficulty options are all, low, medium, hard, very hard, and extreme. ";
-		}
-		else{
-			validDiff = false;
-		}
-		if(validDiff){
-			speechOutput += "selected. ";
-		}
-		// category check
-		if(cmd.indexOf("everything") >= 0){
-			sessions[id].category = [];
-			speechOutput += "All categories ";
-		}
-		else if(cmd.indexOf("general knowledge") >= 0){
-			sessions[id].category = categoryDict["General Knowledge"];
-			speechOutput += "General knowledge ";
-		}
-		else if(cmd.indexOf("entertainment") >= 0){
-			sessions[id].category = categoryDict["Entertainment"];
-			speechOutput += "Entertainment ";
-		}
-		else if(cmd.indexOf("science") >= 0){
-			sessions[id].category = categoryDict["Science"];
-			speechOutput += "Science ";
-		}
-		else if(cmd.indexOf("geography") >= 0){
-			sessions[id].category = categoryDict["Geography"];
-			speechOutput += "Geography ";
-		}
-		else if(cmd.indexOf("history") >= 0 || cmd.indexOf("mythology") >= 0){
-			sessions[id].category = categoryDict["History and Mythology"];
-			speechOutput += "History and Mythology ";
-		}
-		else if(cmd.indexOf("sports") >= 0){
-			sessions[id].category = categoryDict["Sports"];
-			speechOutput += "Sports ";
-		}
-		else if(cmd.indexOf("art") >= 0){
-			sessions[id].category = categoryDict["Art"];
-			speechOutput += "Art ";
-		}
-		else if(cmd.indexOf("categor") >= 0){
-			validCat = false;
+		// no category but category intent
+		if(cat == "category"){
 			speechOutput += "I'm sorry, that is not an available category. You can choose between the following choices: everything, general knowledge, entertainment, science, geography, history and mythology, sports, and art.";
 		}
-		else{
-			validCat = false;
-		}
-		if(validCat){
-			speechOutput += "selected. ";
+		// category found
+		else if(cat != ""){
+			sessions[id].category = categoryDict[cat];
+			if(cat == "all"){
+				speechOutput += "All categories"
+			}
+			else{
+				speechOutput += cat;
+			}
+			speechOutput += " selected. ";
+			sessions[id].prev = speechOutput;
 		}
 		if(speechOutput == ""){
 			speechOutput = "I'm sorry, I couldn't understand what you said.";
-			reprompt = sessions[id].prev;
-			callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
 		}
 		else{
-			speechOutput += "Are you ready to play?";
-			reprompt = "Are you ready to play?";
-			sessions[id].prev = speechOutput;
-			callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
-		}
-	}
-	else{
-		if(cmd.indexOf("all") >= 0 || 
-			cmd.indexOf("low") >= 0 || cmd.indexOf("easy") >= 0 ||
-			cmd.indexOf("medium") >= 0 || cmd.indexOf("average") >= 0 ||
-			cmd.indexOf("very hard") >= 0 ||
-			cmd.indexOf("hard") >= 0 || cmd.indexOf("high") >= 0 ||
-			cmd.indexOf("extreme") >= 0 ||
-			cmd.indexOf("difficult") >= 0 || cmd.indexOf("mode") >= 0){
-			speechOutput = "Sorry, you can't change the difficulty now. You can change game settings after a question has been answered.";
-		}
-		else if(cmd.indexOf("everything") >= 0 ||
-			cmd.indexOf("general knowledge") >= 0 ||
-			cmd.indexOf("entertainment") >= 0 ||
-			cmd.indexOf("science") >= 0 ||
-			cmd.indexOf("geography") >= 0 ||
-			cmd.indexOf("history") >= 0 || cmd.indexOf("mythology") >= 0 ||
-			cmd.indexOf("sports") >= 0 ||
-			cmd.indexOf("art") >= 0||
-			cmd.indexOf("categor") >= 0){
-			speechOutput = "Sorry, you can't change the category now. You can change game settings after a question has been answered.";
-		}
-		else{
-			speechOutput = "I'm sorry, I couldn't understand what you said.";
-			reprompt = sessions[id].prev;
+			speechOutput += " Are you ready to play?"
 		}
 		callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
 	}
@@ -695,6 +537,66 @@ function handleStop(intent, session, callback){
 	var reprompt = "";
 	delete(sessions[id]); 
 	callback(session.attributes, buildSpeechletResponse(header, speechOutput, reprompt, endSession));
+}
+
+function checkDiff(cmd){
+	if(cmd.indexOf("all") >= 0){
+		return "all";
+	}
+	else if(cmd.indexOf("low") >= 0 || cmd.indexOf("easy") >= 0){
+		return "low";
+	}
+	else if(cmd.indexOf("medium") >= 0 || cmd.indexOf("average") >= 0){
+		return "medium";
+	}
+	else if(cmd.indexOf("very hard") >= 0){
+		return "very hard";
+	}
+	else if(cmd.indexOf("hard") >= 0 || cmd.indexOf("high") >= 0){
+		return "hard";
+	}
+	else if(cmd.indexOf("extreme") >= 0){
+		return "extreme";
+	}
+	else if(cmd.indexOf("difficult") >= 0 || cmd.indexOf("mode") >= 0){
+		return "diff";
+	}
+	else{
+		return "";
+	}
+}
+
+function checkCat(cmd){
+	if(cmd.indexOf("everything") >= 0){
+		return "all";
+	}
+	else if(cmd.indexOf("general knowledge") >= 0){
+		return "General knowledge";
+	}
+	else if(cmd.indexOf("entertainment") >= 0){
+		return "Entertainment";
+	}
+	else if(cmd.indexOf("science") >= 0){
+		return "Science";
+	}
+	else if(cmd.indexOf("geography") >= 0){
+		return "Geography";
+	}
+	else if(cmd.indexOf("history") >= 0 || cmd.indexOf("mythology") >= 0){
+		return "History and Mythology";
+	}
+	else if(cmd.indexOf("sports") >= 0){
+		return "Sports";
+	}
+	else if(cmd.indexOf("art") >= 0){
+		return "Art";
+	}
+	else if(cmd.indexOf("categor") >= 0){
+		return "category";
+	}
+	else{
+		return "";
+	}
 }
 
 function decode(base64){
